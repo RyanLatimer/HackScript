@@ -1,13 +1,13 @@
 import './styles/global.css';
 import { HackScriptEditor } from './components/HackScriptEditor';
-import { HackScriptInterpreter } from './interpreter/HackScriptInterpreter';
+import { HackScriptInterpreterV2 } from './interpreter/HackScriptInterpreterV2';
 
 class App {
     private editor: HackScriptEditor;
-    private interpreter: HackScriptInterpreter;
+    private interpreter: HackScriptInterpreterV2;
 
     constructor() {
-        this.interpreter = new HackScriptInterpreter();
+        this.interpreter = new HackScriptInterpreterV2();
         this.editor = new HackScriptEditor(this.interpreter);
         this.init();
     }

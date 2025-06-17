@@ -1,6 +1,8 @@
 // HackScript Language Specification v2.0
 // A statically-typed, modern programming language with unique syntax
 
+import * as monaco from 'monaco-editor';
+
 export interface TypeInfo {
     name: string;
     primitive: boolean;
@@ -657,5 +659,287 @@ export class HackScriptParser {
         if (token !== expected) {
             throw new Error(`Expected '${expected}', got '${token}'`);
         }
+    }
+}
+
+// Monaco Editor Integration
+export class HackScriptMonacoLanguage {
+    public static readonly LANGUAGE_ID = 'hackscript';
+
+    public static register(): void {
+        // Register the language
+        monaco.languages.register({ id: this.LANGUAGE_ID });
+
+        // Set language configuration
+        monaco.languages.setLanguageConfiguration(this.LANGUAGE_ID, {
+            comments: {
+                lineComment: '//',
+                blockComment: ['/*', '*/']
+            },
+            brackets: [
+                ['{', '}'],
+                ['[', ']'],
+                ['(', ')']
+            ],
+            autoClosingPairs: [
+                { open: '{', close: '}' },
+                { open: '[', close: ']' },
+                { open: '(', close: ')' },
+                { open: '"', close: '"' },
+                { open: "'", close: "'" }
+            ],
+            surroundingPairs: [
+                { open: '{', close: '}' },
+                { open: '[', close: ']' },
+                { open: '(', close: ')' },
+                { open: '"', close: '"' },
+                { open: "'", close: "'" }
+            ]
+        });
+
+        // Set syntax highlighting rules
+        monaco.languages.setMonarchTokensProvider(this.LANGUAGE_ID, {
+            keywords: [
+                'func', 'mut', 'let', 'if', 'else', 'for', 'while', 'return',
+                'break', 'continue', 'struct', 'enum', 'impl', 'import', 'export',
+                'async', 'await', 'try', 'catch', 'throw', 'match', 'case', 'default',
+                'int', 'float', 'string', 'bool', 'char', 'void', 'any'
+            ],
+            
+            operators: [
+                '=', '>', '<', '!', '~', '?', ':', '==', '<=', '>=', '!=',
+                '&&', '||', '++', '--', '+', '-', '*', '/', '&', '|', '^', '%',
+                '<<', '>>', '>>>', '+=', '-=', '*=', '/=', '&=', '|=', '^=',
+                '%=', '<<=', '>>=', '>>>='
+            ],
+
+            symbols: /[=><!~?:&|+\-*\/\^%]+/,
+            escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+
+            tokenizer: {
+                root: [
+                    // identifiers and keywords
+                    [/[a-z_$][\w$]*/, {
+                        cases: {
+                            '@keywords': 'keyword',
+                            '@default': 'identifier'
+                        }
+                    }],
+                    [/[A-Z][\w\$]*/, 'type.identifier'],
+
+                    // whitespace
+                    { include: '@whitespace' },
+
+                    // delimiters and operators
+                    [/[{}()\[\]]/, '@brackets'],
+                    [/[<>](?!@symbols)/, '@brackets'],
+                    [/@symbols/, {
+                        cases: {
+                            '@operators': 'operator',
+                            '@default': ''
+                        }
+                    }],
+
+                    // numbers
+                    [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+                    [/0[xX][0-9a-fA-F]+/, 'number.hex'],
+                    [/\d+/, 'number'],
+
+                    // delimiter: after number because of .\d floats
+                    [/[;,.]/, 'delimiter'],
+
+                    // strings
+                    [/"([^"\\]|\\.)*$/, 'string.invalid'],  // non-teminated string
+                    [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
+                    [/'[^\\']'/, 'string'],
+                    [/(')(@escapes)(')/, ['string', 'string.escape', 'string']],
+                    [/'/, 'string.invalid']
+                ],
+
+                comment: [
+                    [/[^\/*]+/, 'comment'],
+                    [/\/\*/, 'comment', '@push'],
+                    ["\\*/", 'comment', '@pop'],
+                    [/[\/*]/, 'comment']
+                ],
+
+                string: [
+                    [/[^\\"]+/, 'string'],
+                    [/@escapes/, 'string.escape'],
+                    [/\\./, 'string.escape.invalid'],
+                    [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
+                ],
+
+                whitespace: [
+                    [/[ \t\r\n]+/, 'white'],
+                    [/\/\*/, 'comment', '@comment'],
+                    [/\/\/.*$/, 'comment'],
+                ],
+            },
+        });        // Set completion provider with static typing support
+        monaco.languages.registerCompletionItemProvider(this.LANGUAGE_ID, {
+            provideCompletionItems: (model, position) => {
+                const word = model.getWordUntilPosition(position);
+                const range = {
+                    startLineNumber: position.lineNumber,
+                    endLineNumber: position.lineNumber,
+                    startColumn: word.startColumn,
+                    endColumn: word.endColumn
+                };
+                
+                const suggestions: monaco.languages.CompletionItem[] = [                    // Keywords
+                    {
+                        label: 'func',
+                        kind: monaco.languages.CompletionItemKind.Keyword,
+                        insertText: 'func ${1:name}(${2:params}): ${3:type} {\n\t${4}\n}',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Define a function with static typing',
+                        range: range
+                    },
+                    {
+                        label: 'let',
+                        kind: monaco.languages.CompletionItemKind.Keyword,
+                        insertText: 'let ${1:name}: ${2:type} = ${3:value};',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Declare an immutable variable with type annotation',
+                        range: range
+                    },
+                    {
+                        label: 'mut',
+                        kind: monaco.languages.CompletionItemKind.Keyword,
+                        insertText: 'mut ${1:name}: ${2:type} = ${3:value};',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Declare a mutable variable with type annotation',
+                        range: range
+                    },                    {
+                        label: 'if',
+                        kind: monaco.languages.CompletionItemKind.Keyword,
+                        insertText: 'if (${1:condition}) {\n\t${2}\n}',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Conditional statement',
+                        range: range
+                    },
+                    {
+                        label: 'for',
+                        kind: monaco.languages.CompletionItemKind.Keyword,
+                        insertText: 'for (${1:i}: int = 0; ${1:i} < ${2:length}; ${1:i}++) {\n\t${3}\n}',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'For loop with type annotations',
+                        range: range
+                    },
+                    {
+                        label: 'while',
+                        kind: monaco.languages.CompletionItemKind.Keyword,
+                        insertText: 'while (${1:condition}) {\n\t${2}\n}',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'While loop',
+                        range: range
+                    },
+                    // Types
+                    {
+                        label: 'int',
+                        kind: monaco.languages.CompletionItemKind.TypeParameter,
+                        insertText: 'int',
+                        documentation: 'Integer type',
+                        range: range
+                    },
+                    {
+                        label: 'float',
+                        kind: monaco.languages.CompletionItemKind.TypeParameter,
+                        insertText: 'float',
+                        documentation: 'Floating point number type',
+                        range: range
+                    },
+                    {
+                        label: 'string',
+                        kind: monaco.languages.CompletionItemKind.TypeParameter,
+                        insertText: 'string',
+                        documentation: 'String type',
+                        range: range
+                    },
+                    {
+                        label: 'bool',
+                        kind: monaco.languages.CompletionItemKind.TypeParameter,
+                        insertText: 'bool',
+                        documentation: 'Boolean type',
+                        range: range
+                    },
+                    {
+                        label: 'char',
+                        kind: monaco.languages.CompletionItemKind.TypeParameter,
+                        insertText: 'char',
+                        documentation: 'Character type',
+                        range: range
+                    },
+                    {
+                        label: 'void',
+                        kind: monaco.languages.CompletionItemKind.TypeParameter,
+                        insertText: 'void',
+                        documentation: 'Void type (no return value)',
+                        range: range
+                    },
+                    // Built-in functions
+                    {
+                        label: 'print',
+                        kind: monaco.languages.CompletionItemKind.Function,
+                        insertText: 'print(${1:value})',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Print a value to the output',
+                        range: range
+                    },
+                    {
+                        label: 'println',
+                        kind: monaco.languages.CompletionItemKind.Function,
+                        insertText: 'println(${1:value})',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Print a value with a newline',
+                        range: range
+                    },
+                    {
+                        label: 'input',
+                        kind: monaco.languages.CompletionItemKind.Function,
+                        insertText: 'input(${1:prompt})',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Get user input',
+                        range: range
+                    },
+                    {
+                        label: 'typeof',
+                        kind: monaco.languages.CompletionItemKind.Function,
+                        insertText: 'typeof(${1:value})',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Get the type of a value',
+                        range: range
+                    }
+                ];
+
+                return { suggestions };
+            }
+        });
+
+        // Set custom theme
+        monaco.editor.defineTheme('hackscript-theme', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [
+                { token: 'keyword', foreground: '#569cd6', fontStyle: 'bold' },
+                { token: 'type.identifier', foreground: '#4ec9b0', fontStyle: 'bold' },
+                { token: 'identifier', foreground: '#d4d4d4' },
+                { token: 'string', foreground: '#ce9178' },
+                { token: 'number', foreground: '#b5cea8' },
+                { token: 'number.float', foreground: '#b5cea8' },
+                { token: 'number.hex', foreground: '#b5cea8' },
+                { token: 'comment', foreground: '#6a9955', fontStyle: 'italic' },
+                { token: 'operator', foreground: '#d4d4d4' },
+                { token: 'delimiter', foreground: '#d4d4d4' }
+            ],
+            colors: {
+                'editor.background': '#1e1e1e',
+                'editor.foreground': '#d4d4d4',
+                'editor.lineHighlightBackground': '#2d2d30',
+                'editor.selectionBackground': '#264f78',
+                'editor.inactiveSelectionBackground': '#3a3d41'
+            }
+        });
     }
 }

@@ -1,24 +1,24 @@
 import * as monaco from 'monaco-editor';
-import { HackScriptInterpreter, ExecutionResult } from '../interpreter/HackScriptInterpreter';
-import { HackScriptLanguage } from '../language/HackScriptLanguage';
+import { HackScriptInterpreterV2, ExecutionResult } from '../interpreter/HackScriptInterpreterV2';
+import { HackScriptMonacoLanguage } from '../language/HackScriptLanguageV2';
+import { SyntaxGuide } from './SyntaxGuide';
 import './HackScriptEditor.css';
 
 export class HackScriptEditor {
     private editor?: monaco.editor.IStandaloneCodeEditor;
-    private interpreter: HackScriptInterpreter;
+    private interpreter: HackScriptInterpreterV2;
+    private syntaxGuide: SyntaxGuide;
     private container?: HTMLElement;
     private outputContainer?: HTMLElement;
     private isRunning = false;
 
-    constructor(interpreter: HackScriptInterpreter) {
+    constructor(interpreter: HackScriptInterpreterV2) {
         this.interpreter = interpreter;
-    }
-
-    public async initialize(container: HTMLElement): Promise<void> {
+        this.syntaxGuide = new SyntaxGuide();
+    }    public async initialize(container: HTMLElement): Promise<void> {
         this.container = container;
-        
-        // Register HackScript language
-        HackScriptLanguage.register();
+          // Register HackScript language
+        HackScriptMonacoLanguage.register();
         
         // Create the editor layout
         this.createLayout();
@@ -26,8 +26,16 @@ export class HackScriptEditor {
         // Initialize Monaco Editor
         await this.initializeEditor();
         
+        // Initialize syntax guide
+        this.syntaxGuide.initialize(container);
+        
         // Setup event listeners
         this.setupEventListeners();
+        
+        // Show syntax guide on first load
+        setTimeout(() => {
+            this.syntaxGuide.show();
+        }, 500);
     }
 
     private createLayout(): void {
@@ -44,8 +52,14 @@ export class HackScriptEditor {
                             </svg>
                             <span>HackScript Editor</span>
                         </div>
-                    </div>
-                    <div class="header-right">
+                    </div>                    <div class="header-right">
+                        <button id="syntax-guide-btn" class="btn">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/>
+                            </svg>
+                            Syntax Guide
+                        </button>
                         <button id="run-btn" class="btn btn-primary">
                             <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                 <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/>
@@ -109,7 +123,7 @@ export class HackScriptEditor {
         }        // Configure Monaco Editor
         this.editor = monaco.editor.create(editorContainer, {
             value: this.getDefaultCode(),
-            language: HackScriptLanguage.LANGUAGE_ID,
+            language: HackScriptMonacoLanguage.LANGUAGE_ID,
             theme: 'hackscript-dark',
             automaticLayout: true,
             fontSize: 14,
@@ -140,10 +154,12 @@ export class HackScriptEditor {
                 positionElement.textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
             }
         });
-    }
-
-    private setupEventListeners(): void {
+    }    private setupEventListeners(): void {
         if (!this.container) return;
+
+        // Syntax guide button
+        const syntaxGuideBtn = this.container.querySelector('#syntax-guide-btn') as HTMLButtonElement;
+        syntaxGuideBtn?.addEventListener('click', () => this.syntaxGuide.toggle());
 
         // Run button
         const runBtn = this.container.querySelector('#run-btn') as HTMLButtonElement;
@@ -167,40 +183,45 @@ export class HackScriptEditor {
                 e.preventDefault();
                 this.runCode();
             }
+            if (e.key === 'F1') {
+                e.preventDefault();
+                this.syntaxGuide.toggle();
+            }
         });
-    }
+    }    private getDefaultCode(): string {
+        return `// Welcome to HackScript v2.0!
+// A statically-typed programming language with modern syntax.
+// Press F1 or click "Syntax Guide" to learn the language.
 
-    private getDefaultCode(): string {
-        return `// Welcome to HackScript!
-// This is a simple programming language that runs in your browser.
+// Variable declarations with explicit types
+let name: string = "HackScript";
+let version: float = 2.0;
+let isReady: bool = true;
 
-// Print a message
-print("Hello, HackScript!")
+// Print basic information
+print("Welcome to", name, "v" + toString(version));
+print("Language ready:", isReady);
 
-// Variables
-name = "World"
-age = 25
-pi = 3.14159
+// Working with arrays
+const numbers: Array<int> = [1, 2, 3, 4, 5];
+print("Numbers:", numbers);
+print("Array length:", len(numbers));
 
-print("Name:", name)
-print("Age:", age)
-print("Pi:", pi)
+// Function declaration with type annotations
+func greet(personName: string) -> string {
+    return "Hello, " + personName + "!";
+}
 
-// Arrays
-numbers = [1, 2, 3, 4, 5]
-print("Numbers:", numbers)
-print("Array length:", len(numbers))
-
-// Simple calculations
-result = age * 2
-print("Double age:", result)
+// Call the function
+const greeting: string = greet("Developer");
+print(greeting);
 
 // Type checking
-print("Type of name:", type(name))
-print("Type of age:", type(age))
-print("Type of numbers:", type(numbers))
+print("Type of name:", type(name));
+print("Type of numbers:", type(numbers));
 
-// Try running this code with Ctrl+Enter or the Run button!`;
+// Try running this code with Ctrl+Enter or the Run button!
+// Open the Syntax Guide (F1) to learn more features.`;
     }
 
     private async runCode(): Promise<void> {
@@ -239,12 +260,38 @@ print("Type of numbers:", type(numbers))
                 `;
             }
         }
-    }
-
-    private displayResult(result: ExecutionResult): void {
+    }    private displayResult(result: ExecutionResult): void {
         if (!this.outputContainer) return;
 
         const timestamp = new Date().toLocaleTimeString();
+        let outputContent = '';
+        
+        if (result.compileErrors && result.compileErrors.length > 0) {
+            // Show compile errors
+            outputContent = result.compileErrors.map(error => 
+                `<div class="error-line">Line ${error.line}: ${this.escapeHtml(error.message)}</div>`
+            ).join('');
+        } else if (result.success) {
+            // Show successful execution output
+            if (result.output && result.output.length > 0) {
+                outputContent = result.output.map(line => 
+                    `<div class="output-line">${this.escapeHtml(line)}</div>`
+                ).join('');
+            } else {
+                outputContent = '<div class="output-line">Program executed successfully (no output)</div>';
+            }
+            
+            // Show warnings if any
+            if (result.warnings && result.warnings.length > 0) {
+                outputContent += result.warnings.map(warning => 
+                    `<div class="warning-line">${this.escapeHtml(warning)}</div>`
+                ).join('');
+            }
+        } else {
+            // Show runtime error
+            outputContent = `<div class="error-line">${this.escapeHtml(result.error || 'Unknown error')}</div>`;
+        }
+
         const outputHtml = `
             <div class="output-entry ${result.success ? 'success' : 'error'}">
                 <div class="output-header">
@@ -252,13 +299,7 @@ print("Type of numbers:", type(numbers))
                     <span class="output-status">${result.success ? 'Success' : 'Error'}</span>
                 </div>
                 <div class="output-content">
-                    ${result.success ? 
-                        (result.output && result.output.length > 0 ? 
-                            result.output.map(line => `<div class="output-line">${this.escapeHtml(line)}</div>`).join('') :
-                            '<div class="output-line">Program executed successfully (no output)</div>'
-                        ) :
-                        `<div class="error-line">${this.escapeHtml(result.error || 'Unknown error')}</div>`
-                    }
+                    ${outputContent}
                 </div>
             </div>
         `;
