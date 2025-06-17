@@ -1,0 +1,27 @@
+{
+  "name": "hackscript-editor",
+  "version": "1.0.0",
+  "description": "A beautiful web-based code editor for the HackScript programming language",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+  },
+  "keywords": ["hackscript", "code-editor", "typescript", "web-editor"],
+  "author": "Ryan Latimer",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.45.0",
+    "typescript": "^5.0.2",
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@monaco-editor/loader": "^1.4.0",
+    "monaco-editor": "^0.45.0"
+  }
+}
